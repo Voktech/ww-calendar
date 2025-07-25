@@ -1,11 +1,14 @@
 <template>
-    <div class="fullcalendar-wrapper modern-buttons" :style="calendarStyles">
+    <div class="fullcalendar-wrapper modern-buttons" :style="calendarStyles" ref="calendarWrapper">
         <FullCalendar ref="fullCalendarRef" :options="calendarOptions"></FullCalendar>
+        <div v-if="showTooltip" :style="tooltipStyle" class="event-tooltip">
+            <div class="tooltip-title">{{ tooltipContent }}</div>
+        </div>
     </div>
 </template>
 
 <script>
-import { useTemplateRef, computed, watch } from 'vue';
+import { useTemplateRef, computed, watch, ref } from 'vue';
 import FullCalendar from '@fullcalendar/vue3';
 import dayGridPlugin from '@fullcalendar/daygrid';
 import timeGridPlugin from '@fullcalendar/timegrid';
@@ -28,6 +31,11 @@ export default {
     emits: ['trigger-event'],
     setup(props, { emit }) {
         const fullCalendarRef = useTemplateRef(null);
+        const calendarWrapper = useTemplateRef(null);
+
+        const tooltipContent = ref('');
+        const tooltipStyle = ref({});
+        const showTooltip = ref(false);
 
         // Editor state
         const isEditing = computed(() => {
@@ -37,6 +45,35 @@ export default {
             // eslint-disable-next-line no-unreachable
             return false;
         });
+
+        const handleEventMouseEnter = info => {
+            if (isEditing.value || props.content?.disableInteractions) return;
+
+            const event = info.event;
+            tooltipContent.value = event.title;
+
+            const eventRect = info.el.getBoundingClientRect();
+            const wrapperRect = calendarWrapper.value.getBoundingClientRect();
+
+            tooltipStyle.value = {
+                top: `${eventRect.top - wrapperRect.top + eventRect.height}px`,
+                left: `${eventRect.left - wrapperRect.left}px`,
+                position: 'absolute',
+                'z-index': 1000,
+                'background-color': 'white',
+                'border': '1px solid #ccc',
+                'padding': '5px',
+                'border-radius': '5px',
+                'max-width': '300px',
+                'white-space': 'normal',
+                'word-wrap': 'break-word',
+            };
+            showTooltip.value = true;
+        };
+
+        const handleEventMouseLeave = () => {
+            showTooltip.value = false;
+        };
 
         // Internal variables
         const { value: currentView, setValue: setCurrentView } = wwLib.wwVariable.useComponentVariable({
@@ -264,6 +301,8 @@ export default {
                 stickyHeaderDates: true,
                 noEventsContent: props.content?.noEventsText ? wwLib.wwLang.getText(props.content.noEventsText) : undefined,
                 buttonText: Object.keys(buttonText).length > 0 ? buttonText : undefined,
+                eventMouseEnter: handleEventMouseEnter,
+                eventMouseLeave: handleEventMouseLeave,
                 // Add all event handlers directly to the options object
                 eventClick: info => {
                     if (isEditing.value || props.content?.disableInteractions) return;
@@ -540,6 +579,24 @@ export default {
     --fc-day-header-height: auto;
     position: relative;
     overflow: auto;
+}
+.event-tooltip {
+    position: absolute;
+    background-color: white;
+    border: 1px solid #ccc;
+    padding: 8px;
+    border-radius: 4px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+    z-index: 1000;
+    max-width: 300px;
+    white-space: normal;
+    word-wrap: break-word;
+    pointer-events: none; /* Allows clicks to pass through to the element behind */
+}
+.tooltip-title {
+    font-weight: bold;
+    margin-bottom: 4px;
+}
 
     &.dark-mode {
         --fc-border-color: #444;
